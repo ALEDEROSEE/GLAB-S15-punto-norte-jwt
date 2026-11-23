@@ -16,6 +16,8 @@ py -m venv .venv
 .\.venv\Scripts\python.exe .\backend\manage.py runserver 127.0.0.1:8000 --noreload
 ```
 
+Si el comando `py` no está disponible, usa `python -m venv .venv` en la primera línea.
+
 En la segunda terminal, levanta React.
 
 ```powershell
@@ -38,7 +40,7 @@ Abre [Punto Norte](http://127.0.0.1:5173/login). La cuenta sembrada es `cliente.
 
 El access dura cinco minutos. El refresh dura una hora desde la última emisión y se reemplaza al renovar. Django rechaza el refresh anterior y devuelve únicamente los pedidos del usuario identificado por el token. React guarda el par en una sola clave en `sessionStorage`, vuelve a validar al recargar y borra la clave al cerrar. El access previamente emitido conserva su vencimiento original.
 
-CORS permite `http://127.0.0.1:5173` y `http://localhost:5173`. Para reproducir en local el ejemplo de CORS abierto de la guía, define `CORS_ALLOW_ALL_ORIGINS=1` antes de arrancar Django con `DEBUG` activo. El frontend acepta `VITE_API_BASE_URL` si necesitas otro host. En desarrollo, Django genera una clave efímera si no recibe `DJANGO_SECRET_KEY`. Reiniciar el servidor con esa clave efímera invalida la sesión anterior.
+CORS permite `http://127.0.0.1:5173` y `http://localhost:5173`. Para reproducir en local el ejemplo de CORS abierto de la guía, define `CORS_ALLOW_ALL_ORIGINS=1` antes de arrancar Django con `DEBUG` activo. El frontend acepta `VITE_API_URL` si necesitas otro host. En desarrollo, Django genera una clave efímera si no recibe `DJANGO_SECRET_KEY`. Reiniciar el servidor con esa clave efímera invalida la sesión anterior.
 
 ## Pruebas
 
