@@ -1,0 +1,432 @@
+{
+  "info": {
+    "name": "GLAB 15 | Seguridad JWT en comercio electrónico",
+    "description": "Validación local de autenticación y permisos con Django REST Framework y SimpleJWT. Ejecutar en orden. La cuenta y los pedidos pertenecen a una demostración.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "cliente.demo",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "Lab15-Cliente-demo!",
+      "type": "string"
+    },
+    {
+      "key": "frontendOrigin",
+      "value": "http://127.0.0.1:5173",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Acceso público sin token",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/publico",
+        "description": "La ruta pública responde sin credenciales."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.unset('accessToken');",
+              "pm.collectionVariables.unset('refreshToken');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Confirma acceso público', () => pm.expect(pm.response.json().mensaje).to.eql('acceso publico'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Acceso privado sin token",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/privado",
+        "description": "La API rechaza una solicitud a la ruta privada sin Authorization."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+              "pm.test('Envía un detalle de autorización', () => pm.expect(pm.response.json()).to.have.property('detail'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inicio de sesión con clave incorrecta",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/token/",
+        "description": "La autenticación falla con una contraseña de prueba incorrecta.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"incorrecta-para-la-prueba\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+              "pm.test('No emite access ni refresh', () => { const result = pm.response.json(); pm.expect(result).not.to.have.property('access'); pm.expect(result).not.to.have.property('refresh'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inicio de sesión con la cuenta de demo",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/token/",
+        "description": "Obtiene un par de tokens. Los scripts guardan ambos en memoria durante la ejecución.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const result = pm.response.json();",
+              "const isJwt = (value) => typeof value === 'string' && value.split('.').length === 3;",
+              "pm.test('Emite access y refresh con formato JWT', () => { pm.expect(isJwt(result.access)).to.eql(true); pm.expect(isJwt(result.refresh)).to.eql(true); });",
+              "if (pm.response.code === 200 && isJwt(result.access) && isJwt(result.refresh)) {",
+              "  pm.collectionVariables.set('accessToken', result.access);",
+              "  pm.collectionVariables.set('refreshToken', result.refresh);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Acceso privado con Bearer",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "type": "string",
+              "value": "{{accessToken}}"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/privado",
+        "description": "El access JWT autoriza el acceso a los pedidos de demostración."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const result = pm.response.json();",
+              "pm.test('Devuelve el usuario autenticado', () => pm.expect(result.usuario).to.eql(pm.variables.get('username')));",
+              "pm.test('Devuelve pedidos de la cuenta de demo', () => pm.expect(result.pedidos).to.be.an('array').that.is.not.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Renovación de la sesión",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/token/refresh/",
+        "description": "La renovación cambia el refresh y guarda el nuevo par.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh\": \"{{refreshToken}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const result = pm.response.json();",
+              "const previousRefresh = pm.collectionVariables.get('refreshToken');",
+              "pm.test('Devuelve un nuevo refresh y un access', () => { pm.expect(result.access).to.be.a('string').and.not.empty; pm.expect(result.refresh).to.be.a('string').and.not.empty; pm.expect(result.refresh === previousRefresh).to.eql(false); });",
+              "if (pm.response.code === 200 && result.access && result.refresh) {",
+              "  pm.collectionVariables.set('accessToken', result.access);",
+              "  pm.collectionVariables.set('refreshToken', result.refresh);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cierre de la sesión",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/token/logout/",
+        "description": "Invalida el refresh vigente en el servidor. Se conserva únicamente para verificar el rechazo en la solicitud siguiente.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh\": \"{{refreshToken}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Responde desde el endpoint de cierre', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+              "pm.collectionVariables.unset('accessToken');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Renovación después del cierre",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/token/refresh/",
+        "description": "La lista de bloqueo impide renovar la sesión con el refresh cerrado.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh\": \"{{refreshToken}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+              "pm.test('No emite un access con el refresh de la sesión cerrada', () => pm.expect(pm.response.json()).not.to.have.property('access'));",
+              "pm.collectionVariables.unset('accessToken');",
+              "pm.collectionVariables.unset('refreshToken');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Acceso privado después del cierre",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/privado",
+        "description": "Una nueva solicitud sin Bearer vuelve a quedar fuera de la ruta privada."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+              "pm.test('Envía un detalle de autorización', () => pm.expect(pm.response.json()).to.have.property('detail'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Preflight de React al endpoint privado",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "OPTIONS",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "{{frontendOrigin}}"
+          },
+          {
+            "key": "Access-Control-Request-Method",
+            "value": "GET"
+          },
+          {
+            "key": "Access-Control-Request-Headers",
+            "value": "authorization"
+          }
+        ],
+        "url": "{{baseUrl}}/api/privado",
+        "description": "El navegador recibe permiso para enviar Authorization desde el origen local de React."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Reconoce el origen local de React', () => pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.eql(pm.variables.get('frontendOrigin')));",
+              "pm.test('Permite el encabezado Authorization', () => pm.expect(pm.response.headers.get('Access-Control-Allow-Headers').toLowerCase()).to.include('authorization'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
